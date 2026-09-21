@@ -1,0 +1,16 @@
+.git/
+.venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+notebooks/
+tests/
+used_cars_data.csv
+.DS_Store
+README.md
+REPORT.md
