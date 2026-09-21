@@ -9,6 +9,8 @@ dependencies = [
     "matplotlib>=3.9,<4",
     "numpy>=1.26,<3",
     "pandas>=2.2,<3",
+    "psycopg[binary]>=3.2,<4",
+    "pydantic-settings>=2.7,<3",
     "scikit-learn>=1.5,<2",
     "uvicorn[standard]>=0.30,<1",
 ]
