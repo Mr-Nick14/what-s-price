@@ -1,6 +1,4 @@
-"""PostgreSQL persistence for prediction requests."""
-
-from __future__ import annotations
+"""Журнал прогнозов в PostgreSQL."""
 
 from typing import Any
 
@@ -15,7 +13,7 @@ CREATE TABLE IF NOT EXISTS predictions (
     ts TIMESTAMPTZ NOT NULL DEFAULT now(),
     model_version TEXT NOT NULL,
     features JSONB NOT NULL,
-    prediction DOUBLE PRECISION NOT NULL,
+    prediction DOUBLE PRECISION,
     latency_ms REAL NOT NULL,
     status_code SMALLINT NOT NULL
 )
@@ -23,35 +21,36 @@ CREATE TABLE IF NOT EXISTS predictions (
 
 
 def init() -> None:
-    """Create the prediction table when PostgreSQL logging is configured."""
-
+    """Создать таблицу журнала."""
     if not settings.database_url:
         return
 
     with psycopg.connect(settings.database_url) as connection:
+        # Две реплики могут запуститься одновременно.
         connection.execute("SELECT pg_advisory_xact_lock(7001)")
         connection.execute(DDL)
+        # Ошибки 422 сохраняются без прогноза.
+        connection.execute("ALTER TABLE predictions ALTER COLUMN prediction DROP NOT NULL")
 
 
 def save_prediction(
     request_id: str,
     features: dict[str, Any],
-    prediction: float,
+    prediction: float | None,
     model_version: str,
     latency_ms: float,
     status_code: int,
 ) -> None:
-    """Persist one completed prediction without affecting API-only deployments."""
-
+    """Сохранить запрос."""
     if not settings.database_url:
         return
 
     with psycopg.connect(settings.database_url) as connection:
         connection.execute(
             """
-            INSERT INTO predictions (
-                request_id, model_version, features, prediction, latency_ms, status_code
-            ) VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO predictions
+                (request_id, model_version, features, prediction, latency_ms, status_code)
+            VALUES (%s, %s, %s, %s, %s, %s)
             """,
             (
                 request_id,

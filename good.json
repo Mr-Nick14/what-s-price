@@ -1,0 +1,14 @@
+{
+  "make_name": "Nissan",
+  "model_name": "Sentra",
+  "year": 2020,
+  "mileage": 5.0,
+  "engine_displacement": 2000.0,
+  "horsepower": 149.0,
+  "fuel_type": "Gasoline",
+  "transmission_display": "Continuously Variable Transmission",
+  "body_type": "Sedan",
+  "wheel_system": "FWD",
+  "is_new": true,
+  "has_accidents": null
+}

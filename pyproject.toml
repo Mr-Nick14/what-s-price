@@ -1,7 +1,7 @@
 [project]
 name = "what-s-price"
 version = "0.1.0"
-description = "Educational ML service for used-car price prediction"
+description = "Used-car price prediction API"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "fastapi>=0.115,<1",
@@ -20,6 +20,7 @@ dev = [
     "httpx>=0.28,<1",
     "ipykernel>=6.29,<7",
     "jupyterlab>=4.3,<5",
+    "locust>=2.46.6",
     "pytest>=8.3,<9",
     "ruff>=0.9,<1",
 ]
@@ -37,4 +38,5 @@ select = ["E", "F", "I"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 addopts = "-ra"

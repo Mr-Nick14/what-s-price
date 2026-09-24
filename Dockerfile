@@ -8,7 +8,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.10.6 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
-# Keep dependency installation cacheable while application code changes.
+# Кэшируем установку зависимостей.
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev --no-install-project
 
