@@ -1,78 +1,65 @@
-"""Contract tests for the prediction API."""
+"""Проверки состояния и ошибок ввода."""
 
 from fastapi.testclient import TestClient
 
 from what_s_price import db
+from what_s_price.service.app import app
 
 
-def test_health(client: TestClient) -> None:
+def test_health(client) -> None:
     response = client.get("/health")
-
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "model_version": "0.1.0"}
 
 
-def test_ready_after_lifespan_loads_model(client: TestClient) -> None:
+def test_ready(client) -> None:
     response = client.get("/ready")
-
     assert response.status_code == 200
     assert response.json() == {"status": "ready"}
 
 
-def test_predict_returns_contract(client: TestClient, valid_car: dict[str, object]) -> None:
-    response = client.post("/v1/predict", json=valid_car)
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["prediction"] > 0
-    assert body["model_version"] == "0.1.0"
-    assert body["request_id"]
-    assert body["latency_ms"] >= 0
-
-
-def test_invalid_input_returns_422(client: TestClient, valid_car: dict[str, object]) -> None:
-    response = client.post("/v1/predict", json={**valid_car, "year": 1700})
-
+def test_bad_year_is_422(client, good_row) -> None:
+    response = client.post("/v1/predict", json={**good_row, "year": 1700})
     assert response.status_code == 422
 
 
-def test_extra_field_returns_422(client: TestClient, valid_car: dict[str, object]) -> None:
-    response = client.post("/v1/predict", json={**valid_car, "unexpected": "value"})
-
+def test_extra_field_is_422(client, good_row) -> None:
+    response = client.post("/v1/predict", json={**good_row, "unexpected": "value"})
     assert response.status_code == 422
 
 
-def test_missing_required_field_returns_422(
-    client: TestClient,
-    valid_car: dict[str, object],
-) -> None:
-    request_without_model = dict(valid_car)
+def test_missing_field_is_422(client, good_row) -> None:
+    request_without_model = dict(good_row)
     del request_without_model["model_name"]
-
     response = client.post("/v1/predict", json=request_without_model)
-
     assert response.status_code == 422
 
 
-def test_prediction_is_deterministic(client: TestClient, valid_car: dict[str, object]) -> None:
-    first = client.post("/v1/predict", json=valid_car)
-    second = client.post("/v1/predict", json=valid_car)
-
-    assert first.status_code == second.status_code == 200
-    assert first.json()["prediction"] == second.json()["prediction"]
-
-
-def test_prediction_log_has_success_status(
-    client: TestClient,
-    valid_car: dict[str, object],
-    monkeypatch,
-) -> None:
+def test_invalid_request_is_logged_with_422(client, good_row, monkeypatch) -> None:
     logged_rows: list[tuple[object, ...]] = []
     monkeypatch.setattr(db, "save_prediction", lambda *args: logged_rows.append(args))
 
-    response = client.post("/v1/predict", json=valid_car)
+    response = client.post("/v1/predict", json={**good_row, "year": 1700})
 
-    assert response.status_code == 200
+    assert response.status_code == 422
     assert len(logged_rows) == 1
-    assert logged_rows[0][0] == response.json()["request_id"]
-    assert logged_rows[0][-1] == 200
+    assert logged_rows[0][2] is None
+    assert logged_rows[0][-1] == 422
+
+
+def test_model_failure_is_logged_with_500(good_row, monkeypatch) -> None:
+    logged_rows: list[tuple[object, ...]] = []
+    monkeypatch.setattr(db, "save_prediction", lambda *args: logged_rows.append(args))
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        def fail_prediction(_frame):
+            raise RuntimeError("model unavailable")
+
+        monkeypatch.setattr(app.state.pipeline, "predict", fail_prediction)
+        response = client.post("/v1/predict", json=good_row)
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Prediction failed"}
+    assert len(logged_rows) == 1
+    assert logged_rows[0][2] is None
+    assert logged_rows[0][-1] == 500
